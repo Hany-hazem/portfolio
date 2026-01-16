@@ -1,0 +1,2 @@
+-- Placeholder for logs schema
+-- This file ensures the migration directory exists

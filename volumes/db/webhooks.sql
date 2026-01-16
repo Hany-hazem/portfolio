@@ -1,0 +1,2 @@
+-- Placeholder for webhooks (optional)
+-- This file ensures the migration directory exists

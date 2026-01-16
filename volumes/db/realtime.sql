@@ -1,0 +1,2 @@
+-- Placeholder for realtime schema (managed by realtime service)
+-- This file ensures the migration directory exists
