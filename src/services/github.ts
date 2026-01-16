@@ -30,8 +30,8 @@ export interface GitHubRepo {
   pushed_at: string;
 }
 
-// Use Vercel API route proxy to avoid CORS and rate limiting
-const GITHUB_API_BASE = '/api/github';
+// Use backend API proxy to avoid CORS and rate limiting
+const GITHUB_API_BASE = import.meta.env.VITE_ADMIN_API_BASE ? `${import.meta.env.VITE_ADMIN_API_BASE}/github` : '/github';
 
 // Log activity to Supabase (anon-friendly; stores user_id as null)
 async function logActivity(

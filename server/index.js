@@ -454,6 +454,43 @@ app.post('/admin/logs-public', async (req, res) => {
   }
 });
 
+// ===== GITHUB API PROXY =====
+app.all('/github/*', async (req, res) => {
+  try {
+    const pathParts = req.params[0].split('/').filter(Boolean);
+    const githubPath = pathParts.join('/');
+    const url = new URL(`https://api.github.com/${githubPath}`);
+    
+    // Forward query parameters
+    Object.entries(req.query).forEach(([key, value]) => {
+      if (value) {
+        url.searchParams.append(key, String(value));
+      }
+    });
+    
+    const response = await fetch(url.toString(), {
+      method: req.method,
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Portfolio-App',
+        'Content-Type': 'application/json',
+      },
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+    
+    res.json(data);
+  } catch (error) {
+    console.error('GitHub proxy error:', error);
+    res.status(500).json({ error: error.message || 'GitHub API error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Admin API listening on port ${PORT}`);
   console.log(`✅ Rate limiting: Enabled`);
@@ -461,4 +498,5 @@ app.listen(PORT, () => {
   console.log(`✅ Email notifications: ${resend ? 'Enabled' : 'Disabled'}`);
   console.log(`✅ Audit logging: Enabled`);
   console.log(`✅ Session tokens: Enabled (15 min expiry)`);
+  console.log(`✅ GitHub proxy: Enabled`);
 });
