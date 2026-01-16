@@ -14,8 +14,11 @@ import {
   ExternalLink,
   ChevronDown,
   Menu,
-  X
+  X,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
+import { fetchGitHubUser, fetchGitHubRepos, getUserSettings, type GitHubUser, type GitHubRepo } from './services/github';
 
 interface Skill {
   name: string;
@@ -37,6 +40,13 @@ function App() {
   const [activeSection, setActiveSection] = useState('hero');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  
+  // GitHub data state
+  const [githubUser, setGithubUser] = useState<GitHubUser | null>(null);
+  const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [githubUsername, setGithubUsername] = useState('Hany-hazem');
 
   useEffect(() => {
     setIsVisible(true);
@@ -56,6 +66,43 @@ function App() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch GitHub data on mount
+  useEffect(() => {
+    async function loadGitHubData() {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Check for user settings first (may not be available on public site)
+        let username = 'Hany-hazem'; // default fallback
+        try {
+          const settings = await getUserSettings();
+          username = settings?.github_username || import.meta.env.VITE_GITHUB_USER || 'Hany-hazem';
+        } catch (settingsError) {
+          // Settings not available, use default
+          console.debug('Using default username');
+        }
+        setGithubUsername(username);
+        
+        // Fetch user profile and repos in parallel
+        const [user, repos] = await Promise.all([
+          fetchGitHubUser(username),
+          fetchGitHubRepos(username, { sort: 'updated', per_page: 6 })
+        ]);
+        
+        setGithubUser(user);
+        setGithubRepos(repos.slice(0, 6));
+      } catch (err) {
+        console.error('Failed to fetch GitHub data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load GitHub data');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadGitHubData();
   }, []);
 
   const skills: Skill[] = [
@@ -198,37 +245,59 @@ function App() {
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-teal-900/20"></div>
         <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <h1 className="text-4xl sm:text-6xl font-bold mb-6">
-              <span className="block">Hani Hazem</span>
-              <span className="block text-2xl sm:text-4xl bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">
-                Elbegermy
-              </span>
-            </h1>
-            <p className="text-xl sm:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
-             Computer Science Student & Tech Enthusiast
-            </p>
-            <p className="text-lg text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed">
-             A passionate computer science student exploring various fields including backend development, 
-             system administration, and AI development. Always eager to learn new technologies and 
-             build innovative solutions while discovering my path in the tech world.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button
-                onClick={() => scrollToSection('projects')}
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg font-semibold hover:from-blue-700 hover:to-teal-700 transition-all duration-300 transform hover:scale-105"
-              >
-                View My Work
-              </button>
-              <a
-                href="https://github.com/Hany-hazem"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-3 border border-gray-600 rounded-lg font-semibold hover:bg-gray-800 transition-all duration-300 flex items-center gap-2"
-              >
-                <Github className="w-5 h-5" />
-                GitHub
-              </a>
-            </div>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center">
+                <Loader2 className="w-12 h-12 animate-spin text-blue-400 mb-4" />
+                <p className="text-gray-400">Loading profile...</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center">
+                <AlertCircle className="w-12 h-12 text-red-400 mb-4" />
+                <p className="text-red-400 mb-2">Failed to load GitHub profile</p>
+                <p className="text-gray-500 text-sm">{error}</p>
+              </div>
+            ) : (
+              <>
+                {githubUser?.avatar_url && (
+                  <div className="mb-6">
+                    <img 
+                      src={githubUser.avatar_url} 
+                      alt={githubUser.name || githubUser.login}
+                      className="w-32 h-32 rounded-full mx-auto border-4 border-blue-600 shadow-lg"
+                    />
+                  </div>
+                )}
+                <h1 className="text-4xl sm:text-6xl font-bold mb-6">
+                  <span className="block">{githubUser?.name || 'Hani Hazem'}</span>
+                  <span className="block text-2xl sm:text-4xl bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">
+                    {githubUser?.login || 'Elbegermy'}
+                  </span>
+                </h1>
+                <p className="text-xl sm:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
+                  Computer Science Student & Tech Enthusiast
+                </p>
+                <p className="text-lg text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed">
+                  {githubUser?.bio || 'A passionate computer science student exploring various fields including backend development, system administration, and AI development. Always eager to learn new technologies and build innovative solutions while discovering my path in the tech world.'}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <button
+                    onClick={() => scrollToSection('projects')}
+                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg font-semibold hover:from-blue-700 hover:to-teal-700 transition-all duration-300 transform hover:scale-105"
+                  >
+                    View My Work
+                  </button>
+                  <a
+                    href={githubUser?.html_url || `https://github.com/${githubUsername}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-8 py-3 border border-gray-600 rounded-lg font-semibold hover:bg-gray-800 transition-all duration-300 flex items-center gap-2"
+                  >
+                    <Github className="w-5 h-5" />
+                    GitHub
+                  </a>
+                </div>
+              </>
+            )}
           </div>
         </div>
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
@@ -247,28 +316,51 @@ function App() {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <div className="bg-gradient-to-r from-blue-600 to-teal-600 rounded-2xl p-8 text-center">
-                <User className="w-20 h-20 mx-auto mb-4 text-white" />
-                <h3 className="text-2xl font-bold mb-2">Hani Hazem Elbegermy</h3>
+                {githubUser?.avatar_url && (
+                  <img 
+                    src={githubUser.avatar_url} 
+                    alt={githubUser.name || githubUser.login}
+                    className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-white"
+                  />
+                )}
+                {!githubUser?.avatar_url && <User className="w-20 h-20 mx-auto mb-4 text-white" />}
+                <h3 className="text-2xl font-bold mb-2">{githubUser?.name || 'Hani Hazem Elbegermy'}</h3>
                 <p className="text-blue-100">Backend Developer & Systems Administrator</p>
               </div>
               
               <div className="mt-8 space-y-4">
-                <div className="flex items-center gap-3 text-gray-300">
-                  <Mail className="w-5 h-5 text-blue-400" />
-                  <span>hany.hazem.cs@gmail.com</span>
-                </div>
+                {githubUser?.email && (
+                  <div className="flex items-center gap-3 text-gray-300">
+                    <Mail className="w-5 h-5 text-blue-400" />
+                    <span>{githubUser.email}</span>
+                  </div>
+                )}
+                {!githubUser?.email && (
+                  <div className="flex items-center gap-3 text-gray-300">
+                    <Mail className="w-5 h-5 text-blue-400" />
+                    <span>hany.hazem.cs@gmail.com</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-3 text-gray-300">
                   <Phone className="w-5 h-5 text-blue-400" />
                   <span>+201027579528</span>
                 </div>
-                <div className="flex items-center gap-3 text-gray-300">
-                  <MapPin className="w-5 h-5 text-blue-400" />
-                  <span>Cairo, Egypt</span>
-                </div>
+                {githubUser?.location && (
+                  <div className="flex items-center gap-3 text-gray-300">
+                    <MapPin className="w-5 h-5 text-blue-400" />
+                    <span>{githubUser.location}</span>
+                  </div>
+                )}
+                {!githubUser?.location && (
+                  <div className="flex items-center gap-3 text-gray-300">
+                    <MapPin className="w-5 h-5 text-blue-400" />
+                    <span>Cairo, Egypt</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-3 text-gray-300">
                   <Github className="w-5 h-5 text-blue-400" />
-                  <a href="https://github.com/Hany-hazem" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors">
-                    Hany-hazem
+                  <a href={githubUser?.html_url || `https://github.com/${githubUsername}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors">
+                    {githubUser?.login || githubUsername}
                   </a>
                 </div>
               </div>
@@ -371,58 +463,117 @@ function App() {
             <div className="w-20 h-1 bg-gradient-to-r from-blue-400 to-teal-400 mx-auto"></div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {projects.map((project, index) => (
-              <div
-                key={project.id}
-                className="bg-gray-800 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl"
-              >
-                <div className="p-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg">
-                        {project.icon}
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold mb-1">{project.title}</h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-gray-400">{project.period}</span>
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            project.status === 'In Development' 
-                              ? 'bg-yellow-600/20 text-yellow-400'
-                              : project.status === 'Active'
-                              ? 'bg-green-600/20 text-green-400'
-                              : 'bg-blue-600/20 text-blue-400'
-                          }`}>
-                            {project.status}
-                          </span>
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-400" />
+            </div>
+          ) : githubRepos.length > 0 ? (
+            <div className="grid md:grid-cols-2 gap-8">
+              {githubRepos.map((repo) => (
+                <div
+                  key={repo.id}
+                  className="bg-gray-800 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl"
+                >
+                  <div className="p-8">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg">
+                          <Code className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold mb-1">{repo.name}</h3>
+                          <div className="flex items-center gap-2 text-sm">
+                            {repo.language && (
+                              <span className="text-gray-400">{repo.language}</span>
+                            )}
+                            <span className="text-gray-500">★ {repo.stargazers_count}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <p className="text-gray-300 leading-relaxed mb-6">
-                    {project.description}
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {project.technologies.map((tech) => (
-                      <span
-                        key={tech}
-                        className="px-3 py-1 bg-gray-700 text-gray-300 rounded-lg text-sm"
-                      >
-                        {tech}
-                      </span>
-                    ))}
+                    
+                    <p className="text-gray-300 leading-relaxed mb-6">
+                      {repo.description || 'No description available'}
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {repo.topics?.slice(0, 5).map((topic) => (
+                        <span
+                          key={topic}
+                          className="px-3 py-1 bg-gray-700 text-gray-300 rounded-lg text-sm"
+                        >
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+
+                    <a
+                      href={repo.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      View on GitHub
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-8">
+              {projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="bg-gray-800 rounded-xl overflow-hidden hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl"
+                >
+                  <div className="p-8">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg">
+                          {project.icon}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold mb-1">{project.title}</h3>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-gray-400">{project.period}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              project.status === 'In Development' 
+                                ? 'bg-yellow-600/20 text-yellow-400'
+                                : project.status === 'Active'
+                                ? 'bg-green-600/20 text-green-400'
+                                : 'bg-blue-600/20 text-blue-400'
+                            }`}>
+                              {project.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <p className="text-gray-300 leading-relaxed mb-6">
+                      {project.description}
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {project.technologies.map((tech) => (
+                        <span
+                          key={tech}
+                          className="px-3 py-1 bg-gray-700 text-gray-300 rounded-lg text-sm"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <a
-              href="https://github.com/Hany-hazem"
+              href={githubUser?.html_url || `https://github.com/${githubUsername}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg font-semibold hover:from-blue-700 hover:to-teal-700 transition-all duration-300 transform hover:scale-105"
@@ -480,7 +631,7 @@ function App() {
                 </a>
 
                 <a
-                  href="https://github.com/Hany-hazem"
+                  href={githubUser?.html_url || `https://github.com/${githubUsername}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-4 p-4 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors group"
@@ -490,7 +641,7 @@ function App() {
                   </div>
                   <div>
                     <p className="font-medium">GitHub</p>
-                    <p className="text-gray-400">github.com/Hany-hazem</p>
+                    <p className="text-gray-400">github.com/{githubUser?.login || githubUsername}</p>
                   </div>
                 </a>
               </div>
@@ -532,6 +683,7 @@ function App() {
           </p>
         </div>
       </footer>
+
     </div>
   );
 }
