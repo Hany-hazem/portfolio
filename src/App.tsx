@@ -19,6 +19,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { fetchGitHubUser, fetchGitHubRepos, getUserSettings, type GitHubUser, type GitHubRepo } from './services/github';
+import { getPortfolioCustomization, type PortfolioCustomization } from './lib/portfolio-db';
 
 interface Skill {
   name: string;
@@ -47,6 +48,9 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [githubUsername, setGithubUsername] = useState('Hany-hazem');
+  
+  // Portfolio customization state
+  const [customization, setCustomization] = useState<PortfolioCustomization | null>(null);
 
   useEffect(() => {
     setIsVisible(true);
@@ -66,6 +70,15 @@ function App() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Load portfolio customization on mount
+  useEffect(() => {
+    async function loadCustomization() {
+      const data = await getPortfolioCustomization();
+      if (data) setCustomization(data);
+    }
+    loadCustomization();
   }, []);
 
   // Fetch GitHub data on mount
@@ -268,13 +281,13 @@ function App() {
                   </div>
                 )}
                 <h1 className="text-4xl sm:text-6xl font-bold mb-6">
-                  <span className="block">{githubUser?.name || 'Hani Hazem'}</span>
+                  <span className="block">{customization?.heroTitle || githubUser?.name || 'Hani Hazem'}</span>
                   <span className="block text-2xl sm:text-4xl bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">
                     {githubUser?.login || 'Elbegermy'}
                   </span>
                 </h1>
                 <p className="text-xl sm:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
-                  Computer Science Student & Tech Enthusiast
+                  {customization?.heroSubtitle || 'Computer Science Student & Tech Enthusiast'}
                 </p>
                 <p className="text-lg text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed">
                   {githubUser?.bio || 'A passionate computer science student exploring various fields including backend development, system administration, and AI development. Always eager to learn new technologies and build innovative solutions while discovering my path in the tech world.'}
@@ -369,15 +382,17 @@ function App() {
             <div className="space-y-6">
               <h3 className="text-2xl font-bold mb-4">My Journey</h3>
               <p className="text-gray-300 leading-relaxed">
-                I am a proactive and self-driven individual with a strong passion for technology and hands-on problem-solving. 
+                {customization?.aboutText || `I am a proactive and self-driven individual with a strong passion for technology and hands-on problem-solving. 
                 Currently pursuing my Bachelor's Degree in Computer Science at Arab Open University, I continuously engage in 
-                personal projects to expand my technical skills and explore new concepts.
+                personal projects to expand my technical skills and explore new concepts.`}
               </p>
-              <p className="text-gray-300 leading-relaxed">
-                My expertise spans across backend development, Linux system administration, and AI agent creation. 
-                I'm eager to contribute a blend of practical experience and a commitment to continuous learning to dynamic roles 
-                in the tech industry.
-              </p>
+              {!customization?.aboutText && (
+                <p className="text-gray-300 leading-relaxed">
+                  My expertise spans across backend development, Linux system administration, and AI agent creation. 
+                  I'm eager to contribute a blend of practical experience and a commitment to continuous learning to dynamic roles 
+                  in the tech industry.
+                </p>
+              )}
               
               <div className="bg-gray-800 rounded-lg p-6">
                 <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
